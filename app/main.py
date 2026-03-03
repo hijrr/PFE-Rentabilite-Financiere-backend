@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import auth
+from .routers import auth,GestionClient
 from .database import Base,engine
 app= FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -13,6 +13,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(GestionClient.router)
 @app.get("/ahmeddd")
 def read_root():
     return {"Hello": "World rahma  and amine gbh"}   

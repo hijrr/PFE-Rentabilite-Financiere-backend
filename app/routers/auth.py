@@ -13,7 +13,7 @@ AD_SERVER = f'ldap://{settings.AD_SERVER}'
 AD_DOMAIN = settings.AD_DOMAIN
 
 
-@router.post("/login")
+@router.post("/login",response_model=schemas.Token)
 def login(data: schemas.LoginRequest,db: Session = Depends(get_db)):
 
     user = f"{AD_DOMAIN}\\{data.username}"
@@ -54,4 +54,9 @@ def login(data: schemas.LoginRequest,db: Session = Depends(get_db)):
     token_data = {"user_id": user_db.id, "role": user_db.role.value}
     print("Token Data:", token_data) 
     access_token = oauth2.create_access_token(token_data)
-    return {"access_token": access_token, "token_type": "bearer"}         
+    return {"access_token": access_token, "token_type": "bearer"}      
+
+
+@router.get("/me",response_model=schemas.UserOut)
+def read_current_user(current_user: models.User = Depends(oauth2.get_current_user)):
+    return current_user   
