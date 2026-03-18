@@ -1,13 +1,12 @@
-from fastapi import APIRouter, FastAPI, HTTPException
-import requests,os
-import base64
+from fastapi import APIRouter, HTTPException, Query
+import requests
 DOLIBARR_BASE_URL = "https://alwafa-conseil.com/dolibarr/api/index.php"
 DOLIBARR_API_KEY = "SGnvc5cCGFJD9sp29giVt816E4INf94m"
 LOGO_BASE_URL = "https://alwafa-conseil.com/htdocs/custom/logo_directory/"
 
 router = APIRouter(tags=["Clients"])
 @router.get("/client-logo/{modulepart}/{file_path:path}")
-def get_client_logo(modulepart: str, file_path: str):
+def get_client_logo(modulepart: str, file_path: str,):
 
     url = f"{DOLIBARR_BASE_URL}/documents/download"
 
@@ -17,7 +16,7 @@ def get_client_logo(modulepart: str, file_path: str):
 
     params = {
         "modulepart": modulepart,
-        "original_file": file_path
+        "original_file": file_path,
     }
 
     try:
@@ -35,8 +34,8 @@ def get_client_logo(modulepart: str, file_path: str):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
 @router.get("/clients")
-def get_clients():
-    url = f"{DOLIBARR_BASE_URL}/thirdparties"
+def get_clients(limit: int = Query(10000)):
+    url = f"{DOLIBARR_BASE_URL}/thirdparties?limit={limit}"
     headers = {"DOLAPIKEY": DOLIBARR_API_KEY}
     
     try:
@@ -46,3 +45,19 @@ def get_clients():
         return {"clients": data}  
     except requests.exceptions.RequestException as e:
         return {"error": str(e)}
+    
+    
+@router.get("/invoices")
+def get_invoices(limit: int = Query(10000)):
+    url = f"{DOLIBARR_BASE_URL}/invoices?limit={limit}"
+    headers = {"DOLAPIKEY": DOLIBARR_API_KEY}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Lève une erreur si le statut != 200
+        data = response.json()
+        return {"invoices": data}  
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)}
+    
+    
