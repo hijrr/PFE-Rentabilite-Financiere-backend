@@ -25,9 +25,11 @@ class UserOut(BaseModel):
 class SalariesBase(BaseModel):
     username: str
     role: str
-    projet: Optional[str] = None
+    email: str
+    date_entree: datetime
     tjm: Optional[int] = None
-    
+    adresse: Optional[str] = None
+    num_securite_sociale: int
     
 class SalariesResponse(SalariesBase):
     id: int
@@ -36,11 +38,40 @@ class SalariesResponse(SalariesBase):
 class ProjetsBase(BaseModel):
     nom: str
     client: str
-    jours_travailles: Optional[int] = None
+    marge_cible: Optional[float] = None
+    salarie_id: Optional[int] = None
     tjm: Optional[int] = None
     status_paiement: Optional[str] = None
+    champ_remarque: Optional[str] = None
     
     
 class ProjetResponse(ProjetsBase):
     id: int
+    salarie: Optional[SalariesResponse] = None
+    model_config = ConfigDict(from_attributes=True)
+    
+    
+class HistoriqueSalarieCreate(BaseModel):
+    salarie_id: int
+    date: str                # ex: "2026-05"
+    joursTravailles: float
+    paye: int
+    tjm: float
+    salaireBrut: float
+    netAvantImpot: float
+    netPayer: float
+    chargesPatronales: float
+    facture: int
+    repasRestaurant: float
+    totalCotisationsSalariales: float
+    totalNoteFrais: float
+    totalNoteKilometrique: float
+    totalePercu: float
+    totaleFacture: float
+    salaireNetHorsRepas: float
+    rentabilite: float
+    
+class HistoriqueSalarieResponse(HistoriqueSalarieCreate):
+    id: int
+    salarie: SalariesResponse 
     model_config = ConfigDict(from_attributes=True)

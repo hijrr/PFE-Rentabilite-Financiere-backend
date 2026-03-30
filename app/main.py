@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import GestionProjet, GestionRentabilite, GestionSalaries
+from app.routers import GestionHistorique, GestionProjet, GestionRentabilite, GestionSalaries
 from .routers import auth,GestionClient
 from .database import Base,engine
 app= FastAPI()
@@ -18,6 +18,7 @@ app.include_router(GestionClient.router)
 app.include_router(GestionSalaries.router)
 app.include_router(GestionRentabilite.router)
 app.include_router(GestionProjet.router)
+app.include_router(GestionHistorique.router)
 @app.get("/ahmeddd")
 def read_root():
     return {"Hello": "World rahma  and amine gbh"}   

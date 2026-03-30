@@ -4,7 +4,7 @@ import pdfplumber
 import json
 import requests
 import pandas as pd
-
+import fitz  # PyMuPDF
 router = APIRouter(tags=["Extraction de données"])
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "llama3.2:latest"
@@ -233,4 +233,81 @@ Structure JSON attendue :
         return {
             "error": "Impossible de parser le JSON",
             "raw_response": clean_text
+        }
+
+@router.post("/extract-infosPersonnel/")
+async def extract_infosPersonnel(file: UploadFile = File(...)):
+    try:
+        # 1️⃣ Lecture du contenu du PDF
+        content = await file.read()
+        text = ""
+
+        # Ouverture du PDF en mémoire avec PyMuPDF
+        with fitz.open(stream=content, filetype="pdf") as doc:
+            for page in doc:
+                blocks = page.get_text("blocks")
+                for b in blocks:
+                    text += b[4] + "\n"
+        # 2️⃣ Prompt optimisé
+        prompt = f"""
+Tu es un automate d'extraction de données comptables. 
+Analyse le texte suivant pour extraire les infos du SALARIÉ.
+
+Règles strictes :
+1. "nom_salarie" : Ligne commençant par Monsieur ou Madame.
+2. "adresse" : Adresse complète du SALARIÉ (Rue, CP, Ville).
+3. "numero_ss" : Cherche spécifiquement apres "Convention collective:" apres la premier valeur .
+
+Texte source :
+---
+{text}
+---
+
+Format attendu :
+{{
+  "nom_salarie": null,
+  "adresse": null,
+  "numero_ss": null
+}}
+"""
+
+        # 3️⃣ Appel à Ollama
+        payload = {
+            "model": MODEL_NAME,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0,
+                "seed": 42
+            }
+        }
+
+        r = requests.post(OLLAMA_URL, json=payload, timeout=120)
+        data = r.json()
+
+        print("=== REPONSE BRUTE OLLAMA ===")
+        print(data)
+
+        # 4️⃣ Nettoyage JSON
+        clean_text = data.get("response", "").strip()
+        clean_text = clean_text.replace("```json", "").replace("```", "").strip()
+
+        # 🔥 sécuriser JSON
+        start = clean_text.find("{")
+        end = clean_text.rfind("}") + 1
+        clean_text = clean_text[start:end]
+
+        try:
+            result = json.loads(clean_text)
+            return result
+
+        except Exception:
+            return {
+                "error": "Impossible de parser le JSON",
+                "raw_response": clean_text
+            }
+
+    except Exception as e:
+        return {
+            "error": str(e)
         }

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException,Depends, Response, status
 from .. import schemas,oauth2
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from ..database import get_db
 from typing import List
 from app import models
@@ -17,7 +17,11 @@ def create_projet(projet: schemas.ProjetsBase,db: Session = Depends(get_db),curr
 @router.get("/projets", response_model=List[schemas.ProjetResponse])
 def get_projets(db: Session = Depends(get_db),current_user: models.User = Depends(oauth2.get_current_user),
 ):
-    return db.query(models.Projet).all()
+    projets = db.query(models.Projet).options(
+        joinedload(models.Projet.salarie)
+    ).all()
+    
+    return projets
 
 
 @router.delete("/projet/{id}", status_code=status.HTTP_204_NO_CONTENT)
