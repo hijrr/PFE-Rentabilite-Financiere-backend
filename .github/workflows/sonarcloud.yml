@@ -33,13 +33,11 @@ jobs:
           export PATH=$PATH:$PWD/sonar-scanner-4.8.0.2856-linux/bin
 
       - name: SonarCloud Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          sonar-scanner \
-            -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend \
-            -Dsonar.organization="Rahma Bassou" \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=$SONAR_TOKEN \
-            -Dsonar.sources=. \
+        uses: SonarSource/sonarcloud-github-action@v2.1.0
+        with:
+          projectKey: hijrr_PFE-Rentabilite-Financiere-backend
+          organization: "Rahma Bassou"
+          token: ${{ secrets.SONAR_TOKEN }}
+          args: >
+            -Dsonar.sources=.
             -Dsonar.exclusions=**/tests/**,**/venv/**
