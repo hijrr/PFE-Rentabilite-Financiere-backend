@@ -14,32 +14,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Récupérer le code du dépôt
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Installer Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.12
 
-      # 3️⃣ Installer les dépendances de ton projet
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4️⃣ Lancer l'analyse SonarCloud
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2.1.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend
             -Dsonar.organization=hijrr
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.login=$SONAR_TOKEN
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
             -Dsonar.sources=.
+            -Dsonar.projectBaseDir=.
             -Dsonar.exclusions=**/tests/**,**/venv/**
+            -Dsonar.branch.name=main
