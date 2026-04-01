@@ -1,9 +1,9 @@
 from sqlalchemy.orm import relationship
 
 from .database import Base
-from sqlalchemy import BIGINT, TIMESTAMP, Column, Enum, Float, ForeignKey,Integer,String,Boolean, text
+from sqlalchemy import BIGINT, TIMESTAMP, Column, Enum, Float, ForeignKey,Integer,String, text
 import enum
-
+NOW = text('now()')
 class UserRole(enum.Enum):
     admin = "admin"
     gestionnaire_financier = "gestionnaire_financier"
@@ -18,7 +18,7 @@ class User(Base):
         nullable=False
     )
     created_at = Column(TIMESTAMP(timezone=True),
-                        nullable=False, server_default=text('now()'))
+                        nullable=False, server_default=NOW)
     
     
 class Salaries(Base):
@@ -33,7 +33,7 @@ class Salaries(Base):
     num_securite_sociale=Column(BIGINT, nullable=False)
     projets = relationship("Projet", back_populates="salarie")
     created_at = Column(TIMESTAMP(timezone=True),
-                        nullable=False, server_default=text('now()'))
+                        nullable=False, server_default=NOW)
     
 
 class Projet(Base):
@@ -72,4 +72,4 @@ class HistoriqueSalarie(Base):
     totaleFacture = Column(Float)
     salaireNetHorsRepas = Column(Float)
     rentabilite = Column(Float)
-    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)

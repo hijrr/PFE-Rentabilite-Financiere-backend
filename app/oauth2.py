@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import uuid
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -12,6 +13,9 @@ oauth2_scheme = HTTPBearer() # men http
 
 def create_access_token(data: dict):
     to_encode = data.copy()
+    iat = datetime.utcnow().timestamp()
+    jti = str(uuid.uuid4())
+    to_encode.update({"iat": iat, "jti": jti})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 

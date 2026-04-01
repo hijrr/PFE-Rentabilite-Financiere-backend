@@ -1,3 +1,5 @@
+from typing_extensions import Annotated
+
 from fastapi import APIRouter, HTTPException,Depends
 from .. import schemas,utils,oauth2
 from sqlalchemy.orm import Session
@@ -14,7 +16,7 @@ AD_DOMAIN = settings.AD_DOMAIN
 
 
 @router.post("/login",response_model=schemas.Token)
-def login(data: schemas.LoginRequest,db: Session = Depends(get_db)):
+def login(data: schemas.LoginRequest,db: Annotated[Session, Depends(get_db)]):
 
     user = f"{AD_DOMAIN}\\{data.username}"
 
@@ -58,5 +60,5 @@ def login(data: schemas.LoginRequest,db: Session = Depends(get_db)):
 
 
 @router.get("/me",response_model=schemas.UserOut)
-def read_current_user(current_user: models.User = Depends(oauth2.get_current_user)):
+def read_current_user( current_user: Annotated[models.User, Depends(oauth2.get_current_user)]):
     return current_user   

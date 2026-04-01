@@ -1,3 +1,5 @@
+from typing_extensions import Annotated
+
 from fastapi import APIRouter, HTTPException, Query
 import requests
 DOLIBARR_BASE_URL = "https://alwafa-conseil.com/dolibarr/api/index.php"
@@ -5,7 +7,8 @@ DOLIBARR_API_KEY = "SGnvc5cCGFJD9sp29giVt816E4INf94m"
 LOGO_BASE_URL = "https://alwafa-conseil.com/htdocs/custom/logo_directory/"
 
 router = APIRouter(tags=["Clients"])
-@router.get("/client-logo/{modulepart}/{file_path:path}")
+@router.get("/client-logo/{modulepart}/{file_path:path}", responses={  500: {"description": "Erreur interne lors de la récupération du logo",  "content": {     "application/json": {
+ "example": {"detail": "Erreur lors de l'appel à Dolibarr"}  }}, }})
 def get_client_logo(modulepart: str, file_path: str,):
 
     url = f"{DOLIBARR_BASE_URL}/documents/download"
@@ -33,8 +36,8 @@ def get_client_logo(modulepart: str, file_path: str,):
 
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
-@router.get("/clients")
-def get_clients(limit: int = Query(10000)):
+@router.get("/clients", responses={ 500: { "description": "Erreur lors de la récupération des clients", }})
+def get_clients(limit: Annotated[int, Query()]=10000):
     url = f"{DOLIBARR_BASE_URL}/thirdparties?limit={limit}"
     headers = {"DOLAPIKEY": DOLIBARR_API_KEY}
     
@@ -44,11 +47,11 @@ def get_clients(limit: int = Query(10000)):
         data = response.json()
         return {"clients": data}  
     except requests.exceptions.RequestException as e:
-        return {"error": str(e)}
+         raise HTTPException(status_code=500, detail=str(e))
     
     
-@router.get("/invoices")
-def get_invoices(limit: int = Query(10000)):
+@router.get("/invoices",responses={500: {"description": "Erreur lors de la récupération des factures",}})
+def get_invoices(limit: Annotated[int, Query()]=10000):
     url = f"{DOLIBARR_BASE_URL}/invoices?limit={limit}"
     headers = {"DOLAPIKEY": DOLIBARR_API_KEY}
     

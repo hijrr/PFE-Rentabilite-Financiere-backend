@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException,Depends, Response, status
 from .. import schemas,oauth2
 from sqlalchemy.orm import Session, joinedload
 from ..database import get_db
-from typing import List
+from typing import Annotated, List
 from app import models
 router = APIRouter(tags=["Projets"])
 @router.post("/projets", status_code=status.HTTP_201_CREATED, response_model=schemas.ProjetResponse)
-def create_projet(projet: schemas.ProjetsBase,db: Session = Depends(get_db),current_user: models.User = Depends(oauth2.get_current_user)
+def create_projet(projet: schemas.ProjetsBase,db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
     new_projet = models.Projet(**projet.dict())
     db.add(new_projet)
@@ -15,8 +15,7 @@ def create_projet(projet: schemas.ProjetsBase,db: Session = Depends(get_db),curr
     return new_projet
  
 @router.get("/projets", response_model=List[schemas.ProjetResponse])
-def get_projets(db: Session = Depends(get_db),current_user: models.User = Depends(oauth2.get_current_user),
-):
+def get_projets(db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]):
     projets = db.query(models.Projet).options(
         joinedload(models.Projet.salarie)
     ).all()
@@ -27,8 +26,8 @@ def get_projets(db: Session = Depends(get_db),current_user: models.User = Depend
 @router.delete("/projet/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_projet(
     id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(oauth2.get_current_user)
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
     salarie_query = db.query(models.Projet).filter(models.Projet.id == id)
     salarie = salarie_query.first()
@@ -42,8 +41,8 @@ def delete_projet(
 def update_projet(
     id: int,
     updated_projet: schemas.ProjetsBase,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(oauth2.get_current_user)
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
     salarie_query = db.query(models.Projet).filter(models.Projet.id == id)
     salarie = salarie_query.first()

@@ -152,7 +152,6 @@ Structure JSON attendue :
     r = requests.post(OLLAMA_URL, json=payload, timeout=120)
 
     data = r.json()
-    print("=== REPONSE BRUTE OLLAMA ===")
     print(data)
 
     # 4️⃣ Nettoyage JSON (supprimer backticks Markdown si présent)
@@ -214,7 +213,6 @@ Structure JSON attendue :
     
     r = requests.post(OLLAMA_URL, json=payload, timeout=120)
     data = r.json()
-    print("=== REPONSE BRUTE OLLAMA ===")
     print(data)
 
     # 4️⃣ Nettoyage JSON (supprimer backticks Markdown si présent)
@@ -285,7 +283,6 @@ Format attendu :
         r = requests.post(OLLAMA_URL, json=payload, timeout=120)
         data = r.json()
 
-        print("=== REPONSE BRUTE OLLAMA ===")
         print(data)
 
         # 4️⃣ Nettoyage JSON

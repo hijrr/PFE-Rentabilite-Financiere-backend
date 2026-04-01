@@ -2,12 +2,12 @@ from fastapi import APIRouter, HTTPException,Depends, Response, status
 from .. import schemas,oauth2
 from sqlalchemy.orm import Session
 from ..database import get_db
-from typing import List
+from typing import Annotated, List
 from app import models
 router = APIRouter(tags=["Salaries"])
 
 @router.post("/salaries", status_code=status.HTTP_201_CREATED, response_model=schemas.SalariesResponse)
-def create_post(salarie: schemas.SalariesBase,db: Session = Depends(get_db),current_user: models.User = Depends(oauth2.get_current_user)
+def create_post(salarie: schemas.SalariesBase,db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
     new_salarie = models.Salaries(**salarie.dict())
     db.add(new_salarie)
@@ -16,15 +16,15 @@ def create_post(salarie: schemas.SalariesBase,db: Session = Depends(get_db),curr
     return new_salarie
  
 @router.get("/salaries", response_model=List[schemas.SalariesResponse])
-def get_salaries(db: Session = Depends(get_db),current_user: models.User = Depends(oauth2.get_current_user),
+def get_salaries(db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)],
 ):
     return db.query(models.Salaries).all()
  
 @router.delete("/salarie/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_salarie(
     id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(oauth2.get_current_user)
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
     salarie_query = db.query(models.Salaries).filter(models.Salaries.id == id)
     salarie = salarie_query.first()
@@ -38,8 +38,8 @@ def delete_salarie(
 def update_salarie(
     id: int,
     updated_salarie: schemas.SalariesBase,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(oauth2.get_current_user)
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
     salarie_query = db.query(models.Salaries).filter(models.Salaries.id == id)
     salarie = salarie_query.first()
