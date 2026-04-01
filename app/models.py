@@ -1,7 +1,7 @@
 from sqlalchemy.orm import relationship
 
 from .database import Base
-from sqlalchemy import BIGINT, TIMESTAMP, Column, Enum, Float, ForeignKey,Integer,String, text
+from sqlalchemy import BIGINT, TIMESTAMP, BigInteger, Column, Enum, Float, ForeignKey,Integer,String, Text,text
 import enum
 NOW = text('now()')
 class UserRole(enum.Enum):
@@ -29,7 +29,7 @@ class Salaries(Base):
     role=Column(String, nullable=False)
     tjm=Column(Integer, nullable=True)
     adresse=Column(String, nullable=True)
-    date_entree=Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+    date_entree=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)
     num_securite_sociale=Column(BIGINT, nullable=False)
     projets = relationship("Projet", back_populates="salarie")
     created_at = Column(TIMESTAMP(timezone=True),
@@ -47,7 +47,7 @@ class Projet(Base):
     status_paiement=Column(String, nullable=True)
     salarie_id = Column(Integer, ForeignKey("salaries.id"))
     salarie = relationship("Salaries",back_populates="projets")
-    created_at = Column(TIMESTAMP(timezone=True),nullable=False, server_default=text('now()'))
+    created_at = Column(TIMESTAMP(timezone=True),nullable=False, server_default=NOW)
     
 class HistoriqueSalarie(Base):
     __tablename__ = "historique_salarie"
@@ -73,3 +73,56 @@ class HistoriqueSalarie(Base):
     salaireNetHorsRepas = Column(Float)
     rentabilite = Column(Float)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)
+    
+class Client(Base):
+    __tablename__ = "Clients"
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    name            = Column(String(128),  nullable=False, comment="Nom du client")
+    code_client     = Column(String(24),   nullable=True,  comment="Code client unique")
+    client          = Column(String(1),    nullable=True,  comment="1=Client, 2=Prospect")
+    logo            = Column(String(255),  nullable=True,  comment="Nom du fichier logo")
+    email           = Column(String(128),  nullable=True)
+    phone           = Column(String(20),   nullable=True,  comment="Téléphone")
+    fax             = Column(String(20),   nullable=True)
+    url             = Column(String(255),  nullable=True,  comment="Site web")
+    address         = Column(Text,         nullable=True)
+    zip             = Column(String(25),   nullable=True,  comment="Code postal")
+    town            = Column(String(50),   nullable=True,  comment="Ville")
+    country_code    = Column(String(2),    nullable=True,  comment="Code ISO pays (FR, GB…)")
+    idprof1         = Column(String(20),   nullable=True,  comment="SIRET (14 chiffres)")
+    idprof2         = Column(String(20),   nullable=True,  comment="SIREN")
+    idprof3         = Column(String(20),   nullable=True,  comment="Code NAF / APE")
+    tva_intra       = Column(String(20),   nullable=True,  comment="N° TVA intracommunautaire")
+    forme_juridique = Column(String(100),  nullable=True,  comment="SAS, SARL, SA…")
+    capital         = Column(Float,        nullable=True,  comment="Capital social en €")
+    effectif        = Column(String(10),   nullable=True,  comment="Tranche effectif")
+    date_creation     = Column(BigInteger, nullable=True)
+    date_modification = Column(BigInteger, nullable=True)
+    factures = relationship("Facture", back_populates="client_obj",
+                            foreign_keys="Facture.socid")
+    
+class Facture(Base):
+    __tablename__ = "factures"
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    ref             = Column(String(30),  nullable=False, unique=True,
+                             comment="Référence facture (ex: FA2024-0001)")
+    socid           = Column(Integer, ForeignKey("Clients.id"),
+                             nullable=False, comment="ID du client (llx_societe)")
+    date                    = Column(BigInteger, nullable=True, comment="Date d'émission")
+    date_lim_reglement      = Column(BigInteger, nullable=True, comment="Date d'échéance")
+    date_creation           = Column(BigInteger, nullable=True, comment="Date de création")
+    date_validation         = Column(BigInteger, nullable=True, comment="Date de validation")
+    total_ht        = Column(Float, nullable=True, default=0.0, comment="Montant HT")
+    total_tva       = Column(Float, nullable=True, default=0.0, comment="Montant TVA")
+    total_ttc       = Column(Float, nullable=True, default=0.0, comment="Montant TTC")
+    sumpayed        = Column(Float, nullable=True, default=0.0, comment="Déjà payé")
+    resteapayer     = Column(Float, nullable=True, default=0.0, comment="Reste à payer")
+    paye            = Column(String(1),  nullable=True,
+                             comment="0=Non payée, 1=Payée")
+    statut          = Column(String(1),  nullable=True,
+                             comment="0=Brouillon, 1=Validée/En attente, 2=Clôturée")
+    online_payment_url = Column(String(255), nullable=True,
+                                comment="URL de paiement en ligne")
+    client_obj = relationship("Client", back_populates="factures",
+                              foreign_keys=[socid])
+    
