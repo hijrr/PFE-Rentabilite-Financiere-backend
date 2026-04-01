@@ -33,7 +33,7 @@ jobs:
         run: |
           sonar-scanner \
             -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend \
-            -Dsonar.organization=Rahma Bassou \
+            -Dsonar.organization= "Rahma Bassou" \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login=$SONAR_TOKEN \
             -Dsonar.sources=. \
