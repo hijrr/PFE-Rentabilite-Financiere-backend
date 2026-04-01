@@ -35,9 +35,10 @@ jobs:
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2.1.0
         with:
-          projectKey: hijrr_PFE-Rentabilite-Financiere-backend
-          organization: "Rahma Bassou"
-          token: ${{ secrets.SONAR_TOKEN }}
-          args: >
+           args: >
+            -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend
+            -Dsonar.organization="Rahma Bassou"
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
             -Dsonar.sources=.
             -Dsonar.exclusions=**/tests/**,**/venv/**
