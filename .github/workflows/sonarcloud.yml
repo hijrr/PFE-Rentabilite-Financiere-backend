@@ -38,7 +38,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend
-            -Dsonar.organization="Rahma Bassou"
+            -Dsonar.organization=hijrr
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.login=$SONAR_TOKEN
             -Dsonar.sources=.
