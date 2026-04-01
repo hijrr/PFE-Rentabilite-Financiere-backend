@@ -38,7 +38,7 @@ jobs:
             -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend
             -Dsonar.organization=hijrr
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=.
+            -Dsonar.sources=. 
             -Dsonar.projectBaseDir=.
             -Dsonar.exclusions=**/tests/**,**/venv/**
             -Dsonar.branch.name=main
