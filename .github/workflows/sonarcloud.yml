@@ -27,15 +27,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2.1.0
-        with:
-          args: >
-            -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend
-            -Dsonar.organization=hijrr
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-            -Dsonar.sources=.
-            -Dsonar.projectBaseDir=.
-            -Dsonar.exclusions=**/tests/**,**/venv/**
-            -Dsonar.branch.name=main
+     - name: SonarCloud Scan
+  uses: SonarSource/sonarcloud-github-action@v2.1.0
+  with:
+    args: >
+      -Dsonar.projectKey=hijrr_PFE-Rentabilite-Financiere-backend
+      -Dsonar.organization=hijrr
+      -Dsonar.host.url=https://sonarcloud.io
+      -Dsonar.sources=.
+      -Dsonar.projectBaseDir=.
+      -Dsonar.exclusions=**/tests/**,**/venv/**
+      -Dsonar.branch.name=main
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
