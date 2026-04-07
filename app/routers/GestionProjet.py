@@ -21,6 +21,11 @@ def get_projets(db: Annotated[Session, Depends(get_db)], current_user: Annotated
     ).all()
     
     return projets
+@router.get("/projets/{id}", response_model=List[schemas.ProjetResponse])
+def get_projet(id: int, db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]):
+    projets = db.query(models.Projet).options(joinedload(models.Projet.salarie)).filter(models.Projet.salarie_id == id).all()
+    
+    return projets
 
 
 @router.delete("/projet/{id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -70,7 +70,7 @@ def get_invoices(limit: Annotated[int, Query()]=10000):
 
 @router.get("/clientsBD", responses={500: {"description": "Erreur lors de la récupération des clients"}})
 def populate_clients(
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)],
     limit: Annotated[int, Query()] = 10000
 ):
     try:
@@ -136,8 +136,8 @@ def populate_clients(
 
 @router.get("/facturesBD", responses={500: {"description": "Erreur lors de la récupération des factures"}})
 def populate_factures(
-    db: Annotated[Session, Depends(get_db)],
-    limit: Annotated[int, Query()] = 1000
+    db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)],
+    limit: Annotated[int, Query()] = 10000
 ):
     try:
         url = f"{DOLIBARR_BASE_URL}/invoices?limit={limit}"
@@ -178,6 +178,8 @@ def populate_factures(
                 total_tva=float(f["total_tva"]) if f.get("total_tva") is not None else 0.0,
                 total_ttc=float(f["total_ttc"]) if f.get("total_ttc") is not None else 0.0,
                 sumpayed=float(f["sumpayed"]) if f.get("sumpayed") is not None else 0.0,
+                tjm=float(f["lines"][0]["subprice"]) if f.get("lines") and len(f["lines"]) > 0 and f["lines"][0].get("subprice") else None,
+                jours_travailles=float(f["lines"][0]["qty"]) if f.get("lines") and len(f["lines"]) > 0 and f["lines"][0].get("qty") else None,
                 resteapayer=float(f["resteapayer"]) if f.get("resteapayer") is not None else 0.0,
                 paye=str(f.get("paye", "0")),
                 statut=str(f.get("statut", "0")),

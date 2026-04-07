@@ -1,9 +1,15 @@
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import io
+import os
+import zipfile
+
+import pandas as pd   # ✅ correct
 from fastapi import APIRouter, File, UploadFile
 import pdfplumber
 import json
 import requests
-import pandas as pd
 import fitz  # PyMuPDF
 router = APIRouter(tags=["Extraction de données"])
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -47,7 +53,14 @@ INSTRUCTIONS DE NAVIGATION :
     Les deux nombres sont séparés par un espace. tu vois Total des cotisations et contributions nb1 nb2 nb3
     
    tu dois prend nb2 et nb3 juste apres l'espace de nb1.
-    
+**periode** : 
+    Cherche la ligne qui contient exactement : "Période"
+**nom_salarie** : 
+    1. IGNORE les premières lignes contenant des symboles "##" ou des entêtes de fichier.
+    2. CHERCHE spécifiquement la ligne contenant "Monsieur" ou "Madame" dans le corps du document.
+    3.si tu trouve la ligne avec "Monsieur" ou "Madame", alors tu es quasiment sûr que c'est la ligne du nom du salarié.
+    3. EXTRAIS uniquement ce qui suit immédiatement la civilité.
+    4. - Format final : "Prénom NOM" .
 Regles de formatage :
 1. Les valeurs financières doivent être des nombres (float), pas des chaînes.
 2. Utilise le point (.) comme séparateur décimal.
@@ -67,12 +80,15 @@ Texte source :
 
 Extrais les informations suivantes dans cette structure exacte :
 {{
+  "nom_salarie": null,
+  "periode": null,
   "salaire_brut": null,
   "total_cotisations_salariales": null,
   "charges_patronales": null,
   "repas_restaurant": null,
   "net_avant_impot": null,
-  "net_paye": null
+  "net_paye": null,
+ 
 }}
 """
 
@@ -99,7 +115,7 @@ Extrais les informations suivantes dans cette structure exacte :
     clean_text = clean_text.replace("```json", "")
     clean_text = clean_text.replace("```", "")
     clean_text = clean_text.strip()
-
+    
     try:
         result = json.loads(clean_text)
         return result
@@ -110,7 +126,7 @@ Extrais les informations suivantes dans cette structure exacte :
         }
         
 @router.post("/extract-noteDeFrais/")
-async def extract_payroll(file: UploadFile = File(...)):
+async def extract_payrollNDF(file: UploadFile = File(...)):
 
     try:
         df = pd.read_excel(file.file)
@@ -127,7 +143,11 @@ Règles :
 3. Utilise le point (.) comme séparateur décimal.
 4. Supprime les symboles monétaires (€) et les espaces.
 5. Retourne EXCLUSIVEMENT le JSON, sans aucune explication ni backticks.
-
+6.Identifie la premiere colonne "Date".
+6. variable: ***nom_salarie*** : 
+       1.chercher la mot "Nom" 
+       2.chercher la mot "Prénom"
+         3.extraire le nom et prenom et mettre dans la meme variable "nom_salarie" avec le format prenom nom.
 Texte source :
 ---
 {text}
@@ -135,6 +155,8 @@ Texte source :
 
 Structure JSON attendue :
 {{
+"nom_salarie": null,
+  "date": null,
   "total_a_verser": null,
 }}
 """
@@ -171,7 +193,7 @@ Structure JSON attendue :
 
 
 @router.post("/extract-noteDeFraisKilometrique/")
-async def extract_payroll(file: UploadFile = File(...)):
+async def extract_payrollNDFK(file: UploadFile = File(...)):
 
     try:
         df = pd.read_excel(file.file)
@@ -180,6 +202,10 @@ async def extract_payroll(file: UploadFile = File(...)):
     text = df.to_string(index=False)
     # 2️⃣ Prompt corrigé
     prompt = f"""
+    ### RÈGLE CRITIQUE :
+Réponds UNIQUEMENT avec un objet JSON. 
+NE PAS ajouter de texte avant ou après le JSON.
+NE PAS répéter les valeurs extraites en dehors du JSON.
 Tu es un expert en extraction de données comptables. Ton objectif est d'extraire le montant final de remboursement situé tout en bas à droite du tableau de frais kilométriques.
 
 Instructions :
@@ -187,7 +213,11 @@ Instructions :
 2. Extrais uniquement la valeur numérique finale.
 3. Transforme la valeur en nombre (float) : remplace la virgule par un point, supprime les symboles (€) et les espaces.
 4. Ne fournis aucune explication, raisonnement ou balise Markdown. 
-
+5. Identifie la colonne "Date".
+6. variable: ***nom_salarie*** : 
+       1.chercher la mot "Nom" 
+       2.chercher la mot "Prénom"
+         3.extraire le nom et prenom et mettre dans la meme variable "nom_salarie" avec le format prenom nom.
 Texte source (Tableau Excel converti) :
 ---
 {text}
@@ -195,7 +225,9 @@ Texte source (Tableau Excel converti) :
 
 Structure JSON attendue :
 {{
-  "total_en_euro": null
+  "date": null,
+  "total_en_euro": null,
+   "nom_salarie": null,
 }}
 """
 
@@ -308,3 +340,59 @@ Format attendu :
         return {
             "error": str(e)
         }
+        
+        
+
+executor = ThreadPoolExecutor(max_workers = min(32, os.cpu_count() + 4)) 
+async def process_file(func, file_bytes, filename):
+    loop = asyncio.get_event_loop()
+
+    def wrapper():
+        fake_upload = UploadFile(filename=filename, file=io.BytesIO(file_bytes))
+        return asyncio.run(func(fake_upload))
+
+    return await loop.run_in_executor(executor, wrapper)
+
+@router.post("/extract-ficheDePaie-zip/")
+async def extract_ficheDePaie_zip(file: UploadFile = File(...)):
+    contents = await file.read()
+    zip_file = zipfile.ZipFile(io.BytesIO(contents))
+    tasks = []
+
+    for filename in zip_file.namelist():
+        if filename.endswith(".pdf"):
+            pdf_bytes = zip_file.read(filename)
+            tasks.append(process_file(extract_payroll, pdf_bytes, filename))
+
+    results = await asyncio.gather(*tasks)
+    return [{"filename": filename, "data": results[i]} for i, filename in enumerate([f for f in zip_file.namelist() if f.endswith(".pdf")])]
+
+
+@router.post("/extract-noteDeFrais-zip/")
+async def extract_noteDeFrais_zip(file: UploadFile = File(...)):
+    contents = await file.read()
+    zip_file = zipfile.ZipFile(io.BytesIO(contents))
+    tasks = []
+
+    for filename in zip_file.namelist():
+        if filename.endswith((".xls", ".xlsx")):
+            excel_bytes = zip_file.read(filename)
+            tasks.append(process_file(extract_payrollNDF, excel_bytes, filename))
+
+    results = await asyncio.gather(*tasks)
+    return [{"filename": filename, "data": results[i]} for i, filename in enumerate([f for f in zip_file.namelist() if f.endswith((".xls", ".xlsx"))])]
+
+
+@router.post("/extract-noteDeFraisKilometrique-zip/")
+async def extract_noteDeFraisKilometrique_zip(file: UploadFile = File(...)):
+    contents = await file.read()
+    zip_file = zipfile.ZipFile(io.BytesIO(contents))
+    tasks = []
+
+    for filename in zip_file.namelist():
+        if filename.endswith((".xls", ".xlsx")):
+            excel_bytes = zip_file.read(filename)
+            tasks.append(process_file(extract_payrollNDFK, excel_bytes, filename))
+
+    results = await asyncio.gather(*tasks)
+    return [{"filename": filename, "data": results[i]} for i, filename in enumerate([f for f in zip_file.namelist() if f.endswith((".xls", ".xlsx"))])]

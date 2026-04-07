@@ -31,7 +31,13 @@ class Salaries(Base):
     adresse=Column(String, nullable=True)
     date_entree=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)
     num_securite_sociale=Column(BIGINT, nullable=False)
-    projets = relationship("Projet", back_populates="salarie")
+    projets = relationship("Projet", back_populates="salarie",cascade="all, delete", passive_deletes=True)
+    historiques = relationship(
+    "HistoriqueSalarie",
+    back_populates="salarie",
+    cascade="all, delete",
+    passive_deletes=True
+)
     created_at = Column(TIMESTAMP(timezone=True),
                         nullable=False, server_default=NOW)
     
@@ -45,16 +51,18 @@ class Projet(Base):
     tjm=Column(Integer, nullable=True)
     champ_remarque=Column(String, nullable=True)
     status_paiement=Column(String, nullable=True)
-    salarie_id = Column(Integer, ForeignKey("salaries.id"))
+    salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="CASCADE"),nullable=False)
     salarie = relationship("Salaries",back_populates="projets")
+    historiques_projet = relationship("HistoriqueSalarie", back_populates="projet_sal", cascade="all, delete",passive_deletes=True)
     created_at = Column(TIMESTAMP(timezone=True),nullable=False, server_default=NOW)
     
 class HistoriqueSalarie(Base):
     __tablename__ = "historique_salarie"
-
     id = Column(Integer, primary_key=True, index=True)
-    salarie_id = Column(Integer, ForeignKey("salaries.id"), nullable=False)
-    salarie = relationship("Salaries", backref="historiques")
+    salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="CASCADE"), nullable=False)
+    salarie = relationship("Salaries", back_populates="historiques")
+    projet_id = Column(Integer, ForeignKey("projet.id",ondelete="CASCADE"), nullable=False)
+    projet_sal = relationship("Projet", back_populates="historiques_projet")
     date = Column(String)
     joursTravailles = Column(Float)
     paye = Column(Integer)
@@ -116,6 +124,8 @@ class Facture(Base):
     total_tva       = Column(Float, nullable=True, default=0.0, comment="Montant TVA")
     total_ttc       = Column(Float, nullable=True, default=0.0, comment="Montant TTC")
     sumpayed        = Column(Float, nullable=True, default=0.0, comment="Déjà payé")
+    jours_travailles=Column(Integer,nullable=True,default=0)
+    tjm=Column(Float,nullable=True,default=0.0)
     resteapayer     = Column(Float, nullable=True, default=0.0, comment="Reste à payer")
     paye            = Column(String(1),  nullable=True,
                              comment="0=Non payée, 1=Payée")
@@ -125,4 +135,12 @@ class Facture(Base):
                                 comment="URL de paiement en ligne")
     client_obj = relationship("Client", back_populates="factures",
                               foreign_keys=[socid])
-    
+
+
+
+class Role(Base):
+    __tablename__ = "role"
+    id = Column(Integer, primary_key=True, nullable=False)
+    name = Column(String, nullable=False, unique=True)
+    description=Column(String,nullable=True)
+    created_at=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)

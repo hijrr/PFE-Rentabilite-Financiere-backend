@@ -48,6 +48,7 @@ class ProjetsBase(BaseModel):
 class ProjetResponse(ProjetsBase):
     id: int
     salarie: Optional[SalariesResponse] = None
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
     
     
@@ -69,9 +70,22 @@ class HistoriqueSalarieCreate(BaseModel):
     totalePercu: float
     totaleFacture: float
     salaireNetHorsRepas: float
+    projet_id: int
     rentabilite: float
     
 class HistoriqueSalarieResponse(HistoriqueSalarieCreate):
     id: int
     salarie: SalariesResponse 
+    projet_sal: ProjetResponse
     model_config = ConfigDict(from_attributes=True)
+    
+
+class RoleBase(BaseModel):
+    name:str
+    description:str
+class RoleResponse(RoleBase):
+    id:int
+    model_config = ConfigDict(from_attributes=True)
+
+
+
