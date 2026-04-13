@@ -24,7 +24,7 @@ class UserOut(BaseModel):
     
 class SalariesBase(BaseModel):
     username: str
-    role: str
+    role_id: int
     email: str
     date_entree: datetime
     tjm: Optional[int] = None

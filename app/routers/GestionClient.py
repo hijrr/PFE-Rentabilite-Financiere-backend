@@ -194,6 +194,36 @@ def populate_factures(
 
     db.commit()
     return {"status": "success", "count": new_count}
+
+from concurrent.futures import ThreadPoolExecutor
+
+@router.get("/syncAll")
+def sync_all(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[models.User, Depends(oauth2.get_current_user)],
+):
+    
+    def sync_clients():
+        return populate_clients(db, current_user)
+
+    def sync_factures():
+        return populate_factures(db, current_user)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_clients = executor.submit(sync_clients)
+            future_factures = executor.submit(sync_factures)
+
+            clients_result = future_clients.result()
+            factures_result = future_factures.result()
+
+        return {
+            "clients": clients_result,
+            "invoices": factures_result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @router.get("/GETClients",)
 def get_projets(db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]):
     clients= db.query(models.Client).all()

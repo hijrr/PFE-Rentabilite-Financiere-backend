@@ -20,17 +20,25 @@ class User(Base):
     created_at = Column(TIMESTAMP(timezone=True),
                         nullable=False, server_default=NOW)
     
-    
+class Role(Base):
+    __tablename__ = "role"
+    id = Column(Integer, primary_key=True, nullable=False)
+    name = Column(String, nullable=False, unique=True)
+    description=Column(String,nullable=True)
+    created_at=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)
+    salaries = relationship("Salaries", back_populates="role")
+ 
 class Salaries(Base):
     __tablename__ = "salaries"
     id = Column(Integer, primary_key=True, nullable=False)
     username = Column(String, nullable=False, unique=True)
     email=Column(String, nullable=False, unique=True)
-    role=Column(String, nullable=False)
+    role_id = Column(Integer, ForeignKey("role.id", ondelete="RESTRICT"), nullable=False)
     tjm=Column(Integer, nullable=True)
     adresse=Column(String, nullable=True)
     date_entree=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)
     num_securite_sociale=Column(BIGINT, nullable=False)
+    role= relationship("Role",back_populates="salaries")
     projets = relationship("Projet", back_populates="salarie",cascade="all, delete", passive_deletes=True)
     historiques = relationship(
     "HistoriqueSalarie",
@@ -138,9 +146,3 @@ class Facture(Base):
 
 
 
-class Role(Base):
-    __tablename__ = "role"
-    id = Column(Integer, primary_key=True, nullable=False)
-    name = Column(String, nullable=False, unique=True)
-    description=Column(String,nullable=True)
-    created_at=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)

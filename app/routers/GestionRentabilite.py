@@ -50,9 +50,7 @@ INSTRUCTIONS DE NAVIGATION :
     - Premier nombre = cotisations salariales
     - Deuxième nombre = charges patronales ← c'est celui-ci que je veux
     
-    Les deux nombres sont séparés par un espace. tu vois Total des cotisations et contributions nb1 nb2 nb3
-    
-   tu dois prend nb2 et nb3 juste apres l'espace de nb1.
+   
 **periode** : 
     Cherche la ligne qui contient exactement : "Période"
 **nom_salarie** : 
