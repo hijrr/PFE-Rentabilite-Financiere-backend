@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException,Depends, Response, status
+from sqlalchemy.exc import IntegrityError
 from .. import schemas,oauth2
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -9,11 +10,36 @@ router = APIRouter(tags=["Salaries"])
 @router.post("/salaries", status_code=status.HTTP_201_CREATED, response_model=schemas.SalariesResponse)
 def create_post(salarie: schemas.SalariesBase,db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
-    new_salarie = models.Salaries(**salarie.dict())
-    db.add(new_salarie)
-    db.commit()
-    db.refresh(new_salarie)
-    return new_salarie
+    try:
+        new_salarie = models.Salaries(**salarie.dict())
+        db.add(new_salarie)
+        db.commit()
+        db.refresh(new_salarie)
+        return new_salarie
+
+    except IntegrityError as e:
+        db.rollback()
+
+        error_str = str(e.orig).lower()
+
+        # 🔥 username duplicate
+        if "username" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="❌ Ce nom d'utilisateur existe déjà."
+            )
+
+        # 🔥 email duplicate
+        if "email" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="❌ Cet email existe déjà."
+            )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur base de données lors de la création du salarié."
+        )
  
 @router.get("/salaries", response_model=List[schemas.SalariesResponse])
 def get_salaries(db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)],
@@ -41,10 +67,39 @@ def update_salarie(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
-    salarie_query = db.query(models.Salaries).filter(models.Salaries.id == id)
-    salarie = salarie_query.first()
-    if not salarie:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Salarie with id {id} not found")
-    salarie_query.update(updated_salarie.dict(), synchronize_session=False)
-    db.commit()
-    return salarie_query.first()
+    try:
+        salarie_query = db.query(models.Salaries).filter(models.Salaries.id == id)
+        salarie = salarie_query.first()
+
+        if not salarie:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Salarie with id {id} not found"
+            )
+
+        salarie_query.update(updated_salarie.dict(), synchronize_session=False)
+        db.commit()
+
+        return salarie_query.first()
+
+    except IntegrityError as e:
+        db.rollback()
+
+        error_str = str(e.orig).lower()
+
+        if "username" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="❌ Ce nom d'utilisateur existe déjà."
+            )
+
+        if "email" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="❌ Cet email existe déjà."
+            )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur base de données lors de la modification."
+        )

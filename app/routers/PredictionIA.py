@@ -1,194 +1,185 @@
 import pandas as pd
+import numpy as np
+
 from sklearn.preprocessing import StandardScaler
-from sqlalchemy.orm import Session
-from ..models import HistoriqueSalarie
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, r2_score
+
+from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
-from ..database import get_db
-import numpy as np
 from dateutil.relativedelta import relativedelta
+
+from ..models import HistoriqueSalarie
+from ..database import get_db
 
 router = APIRouter(tags=["PredictionIA"])
 
 
 # ─────────────────────────────────────────────
-# 🔹 Conversion numpy → JSON
+# 🔹 JSON SAFE
 # ─────────────────────────────────────────────
 def convert_numpy(obj):
     if isinstance(obj, dict):
         return {k: convert_numpy(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [convert_numpy(i) for i in obj]
-    elif isinstance(obj, np.integer):
+    if isinstance(obj, (np.integer, np.int64)):
         return int(obj)
-    elif isinstance(obj, np.floating):
+    if isinstance(obj, (np.floating, np.float64)):
         return float(obj)
-    elif isinstance(obj, np.bool_):
-        return bool(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
     return obj
 
 
-FEATURES = ["mois_index"]
-TARGET   = "rentabilite"
-
-
 # ─────────────────────────────────────────────
-# 🔹 Récupération données depuis DB
+# 🔹 DATA
 # ─────────────────────────────────────────────
-def get_donnees_projet(db: Session, projet_id: int) -> pd.DataFrame:
+def get_donnees_projet(db: Session, projet_id: int):
     rows = db.query(
         HistoriqueSalarie.date,
         HistoriqueSalarie.totalePercu,
         HistoriqueSalarie.totaleFacture,
         HistoriqueSalarie.rentabilite,
     ).filter(
-        HistoriqueSalarie.projet_id == projet_id,
-        HistoriqueSalarie.rentabilite != None,
-        HistoriqueSalarie.totalePercu != None,
-        HistoriqueSalarie.totaleFacture != None,
+        HistoriqueSalarie.projet_id == projet_id
     ).order_by(HistoriqueSalarie.date).all()
 
     if not rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(rows, columns=["date", "totalePercu", "totaleFacture", TARGET])
-    df[["totalePercu", "totaleFacture"]] = df[["totalePercu", "totaleFacture"]].fillna(0)
+    df = pd.DataFrame(rows, columns=["date", "cout", "facture", "rentabilite"])
 
-    # Index temporel simple
-    df["mois_index"] = range(len(df))
+    # CLEAN
+    df["cout"] = df["cout"].fillna(0)
+    df["facture"] = df["facture"].fillna(0)
+    df["rentabilite"] = df["rentabilite"].fillna(0)
+
+    df["mois_index"] = np.arange(len(df))
 
     return df
 
 
 # ─────────────────────────────────────────────
-# 🔹 Entraînement modèles
+# 🔹 TRAIN (CORRIGÉ)
 # ─────────────────────────────────────────────
 def entrainer_modele(df: pd.DataFrame):
+
     X = df[["mois_index"]].values
+    y_cout = df["cout"].values
+    y_facture = df["facture"].values
+    y_rentabilite = df["rentabilite"].values
 
-    scaler   = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    scaler = StandardScaler()
+    Xs = scaler.fit_transform(X)
 
-    # Modèle coût
-    model_percu = LinearRegression()
-    model_percu.fit(X_scaled, df["totalePercu"].values)
+    # modèle coût
+    model_cout = LinearRegression()
+    model_cout.fit(Xs, y_cout)
 
-    # Modèle CA (seulement mois payés)
-    df_paye = df[df["totaleFacture"] > 0]
+    # modèle facture (important fallback)
+    model_facture = None
+    df_valid = df[df["facture"] > 0]
 
-    if len(df_paye) >= 2:
-        X_paye_scaled = scaler.transform(df_paye[["mois_index"]].values)
+    if len(df_valid) >= 3:
+        Xf = scaler.transform(df_valid[["mois_index"]].values)
         model_facture = LinearRegression()
-        model_facture.fit(X_paye_scaled, df_paye["totaleFacture"].values)
+        model_facture.fit(Xf, df_valid["facture"].values)
+
+    # prédictions train
+    cout_pred = model_cout.predict(Xs)
+
+    if model_facture:
+        facture_pred = model_facture.predict(Xs)
     else:
-        model_facture = None
+        facture_pred = y_facture
 
-    # ── Métriques (approx)
-    percu_pred   = model_percu.predict(X_scaled)
-    facture_pred = (
-        model_facture.predict(X_scaled)
-        if model_facture else df["totaleFacture"].values
-    )
+    marge_pred = facture_pred - cout_pred
 
-    marge_pred = facture_pred - percu_pred
-    marge_reel = df["rentabilite"].values
-
+    # métriques corrigées
     metriques = {
-        "r2":        round(float(r2_score(marge_reel, marge_pred)), 3),
-        "mae":       round(float(mean_absolute_error(marge_reel, marge_pred)), 2),
-        "nb_mois":   len(df),
-        "fiabilite": "faible" if len(df) < 6 else "bonne"
+        "r2": round(float(r2_score(y_rentabilite, marge_pred)), 3),
+        "mae": round(float(mean_absolute_error(y_rentabilite, marge_pred)), 2),
+        "nb_mois": len(df),
+        "fiabilite": "faible" if len(df) < 6 else "moyenne"
     }
 
-    return model_percu, model_facture, scaler, metriques
+    return model_cout, model_facture, scaler, metriques
 
 
 # ─────────────────────────────────────────────
-# 🔹 Prédiction intelligente
+# 🔹 PREDICTION (AMÉLIORÉE)
 # ─────────────────────────────────────────────
-def predire_marges(model_percu, model_facture, scaler, df: pd.DataFrame, n_mois: int = 3) -> list:
-    dernier_index = int(df["mois_index"].max())
-    derniere_date = pd.to_datetime(df["date"].iloc[-1])
+def predire_marges(model_cout, model_facture, scaler, df, n_mois=3):
 
-    # 🔥 taux de paiement
-    taux_paiement = len(df[df["totaleFacture"] > 0]) / len(df)
+    last_index = int(df["mois_index"].max())
+    last_date = pd.to_datetime(df["date"].iloc[-1])
 
-    # fallback CA
-    moy_facture = float(df[df["totaleFacture"] > 0]["totaleFacture"].mean() or 0)
+    taux_paiement = len(df[df["facture"] > 0]) / len(df)
+
+    mean_facture = df[df["facture"] > 0]["facture"].mean()
+    mean_facture = 0 if np.isnan(mean_facture) else mean_facture
 
     predictions = []
 
     for i in range(1, n_mois + 1):
-        date_str    = (derniere_date + relativedelta(months=i)).strftime("%Y-%m")
-        index_futur = dernier_index + i
 
-        X_futur  = np.array([[index_futur]])
-        X_scaled = scaler.transform(X_futur)
+        x_future = scaler.transform(np.array([[last_index + i]]))
 
-        # Coût
-        percu_futur = float(model_percu.predict(X_scaled)[0])
-        percu_futur = max(0.0, percu_futur)
+        cout = float(model_cout.predict(x_future)[0])
+        cout = max(0, cout)
 
-        # CA
-        if model_facture is not None:
-            facture_futur = float(model_facture.predict(X_scaled)[0])
-            facture_futur = max(0.0, facture_futur)
+        if model_facture:
+            facture = float(model_facture.predict(x_future)[0])
         else:
-            facture_futur = moy_facture
+            facture = mean_facture
 
-        # Marges
-        marge_si_paye     = facture_futur - percu_futur
-        marge_si_non_paye = -percu_futur
+        facture = max(0, facture)
 
-        # 🔥 marge intelligente
+        # marges
+        marge_si_paye = facture - cout
+        marge_si_non_paye = -cout
+
+        # logique probabiliste simple
         marge_probable = (
             taux_paiement * marge_si_paye +
             (1 - taux_paiement) * marge_si_non_paye
         )
 
         predictions.append({
-            "mois":              date_str,
-            "marge_si_paye":     round(marge_si_paye, 2),
+            "mois": (last_date + relativedelta(months=i)).strftime("%Y-%m"),
+            "cout_estime": round(cout, 2),
+            "facture_estime": round(facture, 2),
+            "marge_si_paye": round(marge_si_paye, 2),
             "marge_si_non_paye": round(marge_si_non_paye, 2),
-            "marge_probable":    round(marge_probable, 2),
-            "cout_estime":       round(percu_futur, 2),
-            "ca_estime":         round(facture_futur, 2),
-            "taux_paiement":     round(taux_paiement, 2),
-            "alerte": bool(marge_si_paye < 0 or marge_si_non_paye < 0)
+            "marge_probable": round(marge_probable, 2),
+            "taux_paiement": round(taux_paiement, 2),
+            "alerte": marge_si_paye < 0
         })
 
     return predictions
+
+
 # ─────────────────────────────────────────────
-# 🔹 API endpoint
+# 🔹 API
 # ─────────────────────────────────────────────
 @router.get("/prevision-marge/projet/{projet_id}")
-def prevision_marge_par_projet(projet_id: int, db: Session = Depends(get_db)):
+def prevision(projet_id: int, db: Session = Depends(get_db)):
+
     df = get_donnees_projet(db, projet_id)
 
     if df.empty:
-        raise HTTPException(status_code=404, detail="Aucune donnée trouvée.")
+        raise HTTPException(404, "Aucune donnée")
+
     if len(df) < 2:
-        raise HTTPException(status_code=400, detail=f"Seulement {len(df)} mois. Minimum : 2.")
+        raise HTTPException(400, "Minimum 2 mois requis")
 
-    model_percu, model_facture, scaler, metriques = entrainer_modele(df)
-    predictions = predire_marges(model_percu, model_facture, scaler, df)
+    model_cout, model_facture, scaler, metrics = entrainer_modele(df)
+    predictions = predire_marges(model_cout, model_facture, scaler, df)
 
-    result = {
-        "projet_id":          projet_id,
+    return convert_numpy({
+        "projet_id": projet_id,
         "nb_mois_historique": len(df),
-        "metriques":          metriques,
-        "taux_paiement_global": round(len(df[df["totaleFacture"] > 0]) / len(df), 2),
-        "message_fiabilite": (
-            "Prédiction indicative (moins de 6 mois)"
-            if len(df) < 6 else "Prédiction fiable"
-        ),
-        "historique": df[["date", "totalePercu", "totaleFacture", "rentabilite"]]
-                        .to_dict(orient="records"),
-        "predictions":    predictions,
-        "alerte_globale": bool(any(p["alerte"] for p in predictions))
-    }
-
-    return convert_numpy(result)
+        "metriques": metrics,
+        "historique": df.to_dict(orient="records"),
+        "predictions": predictions,
+        "alerte_globale": any(p["alerte"] for p in predictions)
+    })

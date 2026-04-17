@@ -53,10 +53,10 @@ class Salaries(Base):
 class Projet(Base):
     __tablename__ = "projet"
     id = Column(Integer, primary_key=True, nullable=False)
-    nom = Column(String, nullable=False, unique=False)
+    nom = Column(String, nullable=False, unique=True)
     client=Column(String, nullable=False)
     marge_cible = Column(Float, nullable=True)
-    tjm=Column(Integer, nullable=True)
+    tjm=Column(Integer, nullable=False)
     champ_remarque=Column(String, nullable=True)
     status_paiement=Column(String, nullable=True)
     salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="CASCADE"),nullable=False)

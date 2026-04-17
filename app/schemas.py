@@ -89,3 +89,8 @@ class RoleResponse(RoleBase):
 
 
 
+
+
+class ChatRequest(BaseModel):
+    message: str
+
