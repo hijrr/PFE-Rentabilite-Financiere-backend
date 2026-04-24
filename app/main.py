@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import Dashboard, GestionHistorique, GestionProjet, GestionRentabilite, GestionRole, GestionSalaries, PredictionIA, chatbot
+from app.routers import Dashboard, GestionHistorique, GestionProjet, GestionRentabilite, GestionRole, GestionSalaries, PredictionIA, Reporting, chatbot
 from .routers import auth,GestionClient
 from .database import Base,engine
 app= FastAPI()
@@ -23,6 +23,7 @@ app.include_router(GestionRole.router)
 app.include_router(Dashboard.router)
 app.include_router(PredictionIA.router)
 app.include_router(chatbot.router)
+app.include_router(Reporting.router)
 @app.get("/ahmeddd")
 def read_root():
     return {"Hello": "World rahma  and amine gbh"}   

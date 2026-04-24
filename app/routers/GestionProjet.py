@@ -52,12 +52,27 @@ def delete_projet(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[models.User, Depends(oauth2.get_current_user)]
 ):
-    salarie_query = db.query(models.Projet).filter(models.Projet.id == id)
-    salarie = salarie_query.first()
-    if not salarie:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Projet with id {id} not found")
-    salarie_query.delete(synchronize_session=False)
+    projet = db.query(models.Projet).filter(models.Projet.id == id).first()
+
+    if not projet:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Projet with id {id} not found"
+        )
+
+    has_historiques = db.query(models.HistoriqueSalarie).filter(
+        models.HistoriqueSalarie.projet_id == id
+    ).first()
+
+    if has_historiques:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Impossible de supprimer : ce projet a des historiques"
+        )
+
+    db.delete(projet)
     db.commit()
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.put("/projet/{id}", response_model=schemas.ProjetResponse)

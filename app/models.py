@@ -39,13 +39,10 @@ class Salaries(Base):
     date_entree=Column(TIMESTAMP(timezone=True), nullable=False, server_default=NOW)
     num_securite_sociale=Column(BIGINT, nullable=False)
     role= relationship("Role",back_populates="salaries")
-    projets = relationship("Projet", back_populates="salarie",cascade="all, delete", passive_deletes=True)
+    projets = relationship("Projet", back_populates="salarie")
     historiques = relationship(
     "HistoriqueSalarie",
-    back_populates="salarie",
-    cascade="all, delete",
-    passive_deletes=True
-)
+    back_populates="salarie")
     created_at = Column(TIMESTAMP(timezone=True),
                         nullable=False, server_default=NOW)
     
@@ -59,17 +56,17 @@ class Projet(Base):
     tjm=Column(Integer, nullable=False)
     champ_remarque=Column(String, nullable=True)
     status_paiement=Column(String, nullable=True)
-    salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="CASCADE"),nullable=False)
+    salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="RESTRICT"),nullable=False)
     salarie = relationship("Salaries",back_populates="projets")
-    historiques_projet = relationship("HistoriqueSalarie", back_populates="projet_sal", cascade="all, delete",passive_deletes=True)
+    historiques_projet = relationship("HistoriqueSalarie", back_populates="projet_sal")
     created_at = Column(TIMESTAMP(timezone=True),nullable=False, server_default=NOW)
     
 class HistoriqueSalarie(Base):
     __tablename__ = "historique_salarie"
     id = Column(Integer, primary_key=True, index=True)
-    salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="CASCADE"), nullable=False)
+    salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="RESTRICT"), nullable=False)
     salarie = relationship("Salaries", back_populates="historiques")
-    projet_id = Column(Integer, ForeignKey("projet.id",ondelete="CASCADE"), nullable=False)
+    projet_id = Column(Integer, ForeignKey("projet.id",ondelete="RESTRICT"), nullable=False)
     projet_sal = relationship("Projet", back_populates="historiques_projet")
     date = Column(String)
     joursTravailles = Column(Float)

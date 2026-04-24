@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional,List
 
 from pydantic import BaseModel, ConfigDict
 
@@ -89,8 +89,11 @@ class RoleResponse(RoleBase):
 
 
 
-
+class HistoryMessage(BaseModel):
+      role: str        # "user" ou "assistant"
+      content: str
 
 class ChatRequest(BaseModel):
     message: str
-
+    history: Optional[List[HistoryMessage]] = []
+    forced_lang: Optional[str] = None
