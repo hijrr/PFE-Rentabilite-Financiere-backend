@@ -1,7 +1,9 @@
+from datetime import datetime
+
 from sqlalchemy.orm import relationship
 
 from .database import Base
-from sqlalchemy import BIGINT, TIMESTAMP, BigInteger, Column, Enum, Float, ForeignKey,Integer,String, Text,text
+from sqlalchemy import BIGINT, JSON, TIMESTAMP, BigInteger, Boolean, Column, DateTime, Enum, Float, ForeignKey,Integer,String, Text,text
 import enum
 NOW = text('now()')
 class UserRole(enum.Enum):
@@ -143,3 +145,25 @@ class Facture(Base):
 
 
 
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(String, primary_key=True, index=True)
+    type = Column(String)          # alerte | recommandation | info
+    niveau = Column(String)        # danger | warning | info
+
+    titre = Column(String)
+    message = Column(String)
+
+    recommandation = Column(String, nullable=True)
+
+    projet_id = Column(Integer, nullable=True)
+    projet_nom = Column(String, nullable=True)
+
+    lu = Column(Boolean, default=False)
+
+    date = Column(DateTime, default=datetime.utcnow)
+
+    data = Column(JSON, nullable=True)

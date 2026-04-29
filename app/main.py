@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import Dashboard, GestionHistorique, GestionProjet, GestionRentabilite, GestionRole, GestionSalaries, PredictionIA, Reporting, chatbot
 from .routers import auth,GestionClient
+from app.routers.Notification import router as notifications_router
 from .database import Base,engine
 app= FastAPI()
 #Base.metadata.create_all(bind=engine)
@@ -24,6 +25,7 @@ app.include_router(Dashboard.router)
 app.include_router(PredictionIA.router)
 app.include_router(chatbot.router)
 app.include_router(Reporting.router)
+app.include_router(notifications_router)
 @app.get("/ahmeddd")
 def read_root():
     return {"Hello": "World rahma  and amine gbh"}   
