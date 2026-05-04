@@ -1,13 +1,13 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..models import Projet, Notification
 
 from .PredictionIA import (
@@ -17,6 +17,7 @@ from .PredictionIA import (
     analyser_courbe_globale,
     generer_analyse_courbe_groq,
 )
+from app import models
 
 router = APIRouter(
     prefix="/notifications",
@@ -147,31 +148,69 @@ async def _run_check(db: Session):
 
     projets = db.query(Projet).all()
     nouvelles = []
+    notifications_a_envoyer = []
 
+    # ── Analyse
     for projet in projets:
         try:
             nouvelles.extend(_analyse_un_projet(db, projet))
         except Exception as e:
             print("Erreur projet:", e)
 
+    # ── Filtrer + préparer insert
     for notif in nouvelles:
 
-        # éviter doublons simples
-        exists = db.query(Notification).filter(
-    Notification.id == notif["id"]
-).first()
+        if not notification_existe(db, notif):
 
-        if not exists:
             obj = Notification(**notif)
             db.add(obj)
-            db.commit()
-            db.refresh(obj)
+            notifications_a_envoyer.append(notif)
 
-            await _broadcast(notif)
+    # ── Commit une seule fois
+    db.commit()
 
-    return len(nouvelles)
+    # ── Broadcast async (non bloquant)
+    for notif in notifications_a_envoyer:
+        asyncio.create_task(_broadcast(notif))
 
+    return len(notifications_a_envoyer)
 
+def notification_existe(db: Session, notif: dict) -> bool:
+    limite = datetime.utcnow() - timedelta(minutes=30)
+
+    return db.query(models.Notification).filter(
+        models.Notification.projet_id == notif["projet_id"],
+        models.Notification.type == notif["type"],
+        models.Notification.message == notif["message"],
+        models.Notification.date >= limite
+    ).first() is not None
+
+async def traiter_notifications(projet_id: int):
+    db = SessionLocal()
+
+    try:
+        projet = db.query(models.Projet).filter(
+            models.Projet.id == projet_id
+        ).first()
+
+        if not projet:
+            return
+
+        notifications = _analyse_un_projet(db, projet)
+
+        for notif in notifications:
+
+            if not notification_existe(db, notif):
+
+                obj = models.Notification(**notif)
+                db.add(obj)
+                db.commit()
+                db.refresh(obj)
+
+                await _broadcast(notif)
+
+    finally:
+        db.close()
 # ─────────────────────────────────────────────
 # 🔹 API REST
 # ─────────────────────────────────────────────
