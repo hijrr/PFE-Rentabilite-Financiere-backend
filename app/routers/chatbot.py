@@ -588,3 +588,4 @@ def chat_elzei(
             "content": bot_response
         }
     }
+    

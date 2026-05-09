@@ -1,12 +1,15 @@
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import accuracy_score, mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-
+import matplotlib.pyplot as plt
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
 from dateutil.relativedelta import relativedelta
+from xgboost import XGBClassifier
 
 from ..models import HistoriqueSalarie, Projet
 from ..database import get_db
@@ -33,7 +36,282 @@ def convert_numpy(obj):
         return 0.0
     return obj
 
+def save_comparaison_figure(results: dict, projet_id: int):
 
+    models = list(results.keys())
+
+    accuracies = [
+        results[m]["accuracy"] * 100
+        for m in models
+    ]
+
+    r2_scores = [
+        results[m]["r2"] * 100
+        for m in models
+    ]
+
+    x = np.arange(len(models))
+    width = 0.35
+
+    plt.figure(figsize=(10, 6))
+
+    # =========================
+    # BARRES
+    # =========================
+
+    bars1 = plt.bar(
+        x - width/2,
+        accuracies,
+        width,
+        label="Accuracy (%)"
+    )
+
+    bars2 = plt.bar(
+        x + width/2,
+        r2_scores,
+        width,
+        label="R2 (%)"
+    )
+
+    # =========================
+    # TITRES
+    # =========================
+
+    plt.title(
+        "Comparaison des performances des modèles ML"
+    )
+
+    plt.ylabel("Score (%)")
+
+    plt.xticks(x, models)
+
+    plt.legend()
+
+    # =========================
+    # VALEURS SUR LES BARRES
+    # =========================
+
+    for bar in bars1:
+
+        yval = bar.get_height()
+
+        plt.text(
+            bar.get_x() + bar.get_width()/2,
+            yval + 1,
+            f"{yval:.1f}%",
+            ha='center',
+            va='bottom'
+        )
+
+    for bar in bars2:
+
+        yval = bar.get_height()
+
+        plt.text(
+            bar.get_x() + bar.get_width()/2,
+            yval + 1,
+            f"{yval:.1f}%",
+            ha='center',
+            va='bottom'
+        )
+
+    # =========================
+    # SAVE
+    # =========================
+
+    path = f"static/model_comparaison_projet_{projet_id}.png"
+
+    plt.tight_layout()
+
+    plt.savefig(path)
+
+    plt.close()
+
+    return path
+@router.get("/comparaison-modeles")
+
+def comparaison_modeles_api(
+    projet_id: int,
+    db: Session = Depends(get_db)
+):
+
+    df = get_donnees_projet(db, projet_id)
+
+    if df.empty or len(df) < 5:
+        raise HTTPException(400, "Pas assez de données")
+
+    _, _, metriques = comparer_modeles(df)
+
+    results = metriques["comparaison_modeles"]
+
+    image_path = save_comparaison_figure(
+        results,
+        projet_id
+    )
+
+    return {
+        "resultats": results,
+        "meilleur_modele": metriques["modele"],
+        "figure": image_path
+    }
+def comparer_modeles(df: pd.DataFrame):
+
+    n = len(df)
+
+    X = df[["mois_index"]].values
+    y_paye = df["paye"].values
+    y_rent = df["rentabilite"].values
+
+    scaler_lr = StandardScaler()
+    Xs = scaler_lr.fit_transform(X)
+
+    resultats_modeles = {}
+
+    meilleur_r2 = -999
+    meilleur_modele = None
+    meilleur_nom = ""
+
+    if len(np.unique(y_paye)) > 1:
+
+        # =========================
+        # TRAIN TEST SPLIT
+        # =========================
+
+        X_train, X_test, y_train, y_test = train_test_split(Xs, y_paye,test_size=0.3,random_state=42)
+
+        modeles = {
+
+            "Logistic Regression": LogisticRegression(
+                max_iter=1000
+            ),
+
+            "Random Forest": RandomForestClassifier(
+                n_estimators=100,
+                random_state=42
+            ),
+
+            "XGBoost": XGBClassifier(
+                n_estimators=200,
+                learning_rate=0.05,
+                max_depth=4,
+                eval_metric="logloss",
+                random_state=42
+            )
+        }
+
+        for nom, modele in modeles.items():
+
+            # =========================
+            # ENTRAINEMENT
+            # =========================
+
+            modele.fit(X_train, y_train)
+
+            y_pred_test = modele.predict(X_test)
+
+            accuracy = accuracy_score(
+                y_test,
+                y_pred_test
+            )
+
+
+            prob_paye_hist = modele.predict_proba(Xs)[:, 1]
+
+
+            marge_pred = (
+                prob_paye_hist * (df["facture"].values - df["cout"].values)
+                + (1 - prob_paye_hist) * (-df["cout"].values)
+            )
+
+            # =========================
+            # METRIQUES RENTABILITE
+            # =========================
+
+            r2 = r2_score(
+                y_rent,
+                marge_pred
+            )
+
+            mae = mean_absolute_error(
+                y_rent,
+                marge_pred
+            )
+
+            resultats_modeles[nom] = {
+                "accuracy": round(float(accuracy), 3),
+                "r2": round(float(r2), 3),
+                "mae": round(float(mae), 2)
+            }
+
+            # =========================
+            # MEILLEUR MODELE
+            # =========================
+
+            if r2 > meilleur_r2:
+
+                meilleur_r2 = r2
+                meilleur_mae = mae
+
+                meilleur_modele = modele
+                meilleur_nom = nom
+
+    else:
+
+        scaler_lr = None
+        meilleur_modele = None
+        meilleur_nom = "Aucun"
+
+        prob_paye_hist = np.full(
+            n,
+            float(y_paye.mean())
+        )
+
+        marge_pred = (
+            prob_paye_hist * (df["facture"].values - df["cout"].values)
+            + (1 - prob_paye_hist) * (-df["cout"].values)
+        )
+
+        meilleur_r2 = (
+            r2_score(y_rent, marge_pred)
+            if n >= 2 else 0.0
+        )
+
+        meilleur_mae = mean_absolute_error(
+            y_rent,
+            marge_pred
+        )
+
+    # =========================
+    # MEME FORMAT DE SORTIE
+    # =========================
+
+    metriques = {
+
+        "r2":
+            round(float(meilleur_r2), 3),
+
+        "mae":
+            round(float(meilleur_mae), 2),
+
+        "nb_mois":
+            n,
+
+        "fiabilite":
+            "faible" if n < 6
+            else "moyenne" if n < 12
+            else "bonne",
+
+        "modele":
+            meilleur_nom,
+
+        "taux_paiement_historique":
+            round(float(y_paye.mean()), 3),
+
+        "comparaison_modeles":
+            resultats_modeles
+    }
+
+    return meilleur_modele, scaler_lr, metriques 
 # ─────────────────────────────────────────────
 # 🔹 DATA PAR PROJET
 # ─────────────────────────────────────────────
@@ -82,10 +360,9 @@ def entrainer_modele_probabiliste(df: pd.DataFrame):
     n = len(df)
     X = df[["mois_index"]].values
     y_paye = df["paye"].values
-
+    scaler_lr = StandardScaler()
+    Xs = scaler_lr.fit_transform(X)
     if len(np.unique(y_paye)) > 1:
-        scaler_lr = StandardScaler()
-        Xs = scaler_lr.fit_transform(X)
         model_lr = LogisticRegression()
         model_lr.fit(Xs, y_paye)
         prob_paye_hist = model_lr.predict_proba(Xs)[:, 1]
@@ -115,7 +392,6 @@ def entrainer_modele_probabiliste(df: pd.DataFrame):
 def predire_marges_probabiliste(model_lr, scaler_lr, df: pd.DataFrame, n_mois: int = 3):
     last_index = int(df["mois_index"].max())
     last_date  = df["date"].iloc[-1]
-
     couts_futurs    = _ewm_predict(df["cout"], n_mois, span=6)
     factures_payees = df[df["paye"] == 1]["facture"]
 
