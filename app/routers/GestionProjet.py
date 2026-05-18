@@ -35,13 +35,13 @@ def create_projet(projet: schemas.ProjetsBase,db: Annotated[Session, Depends(get
 @router.get("/projets", response_model=List[schemas.ProjetResponse])
 def get_projets(db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]):
     projets = db.query(models.Projet).options(
-        joinedload(models.Projet.salarie)
+        joinedload(models.Projet.salarie),joinedload(models.Projet.client)
     ).all()
     
     return projets
 @router.get("/projets/{id}", response_model=List[schemas.ProjetResponse])
 def get_projet(id: int, db: Annotated[Session, Depends(get_db)], current_user: Annotated[models.User, Depends(oauth2.get_current_user)]):
-    projets = db.query(models.Projet).options(joinedload(models.Projet.salarie)).filter(models.Projet.salarie_id == id).all()
+    projets = db.query(models.Projet).options(joinedload(models.Projet.salarie),joinedload(models.Projet.client)).filter(models.Projet.salarie_id == id).all()
     
     return projets
 

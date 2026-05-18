@@ -222,15 +222,20 @@ def _get_cached(key: str, builder, ttl: int = 300):
 # ================================================================
 
 def build_projets_context(db: Session, message: str) -> str:
-    words = [w for w in message.lower().split() if len(w) > 3]#ye5ou ken kelmet lekbar taa question 
+    words = [w for w in message.lower().split() if len(w) > 3]
     if words:
         filters = or_(
             *[models.Projet.nom.ilike(f"%{w}%") for w in words],
-            *[models.Projet.client.ilike(f"%{w}%") for w in words]
+            # ✅ Recherche dans le nom du client via jointure
+            *[models.Client.name.ilike(f"%{w}%") for w in words]
         )
         projets = (
             db.query(models.Projet)
-            .options(joinedload(models.Projet.salarie))
+            .options(
+                joinedload(models.Projet.salarie),
+                joinedload(models.Projet.client)   # ✅ charger la relation
+            )
+            .join(models.Client, models.Projet.client_id == models.Client.id, isouter=True)  # ✅ jointure
             .filter(filters)
             .limit(8)
             .all()
@@ -238,17 +243,21 @@ def build_projets_context(db: Session, message: str) -> str:
     else:
         projets = (
             db.query(models.Projet)
-            .options(joinedload(models.Projet.salarie))
+            .options(
+                joinedload(models.Projet.salarie),
+                joinedload(models.Projet.client)   # ✅
+            )
             .order_by(models.Projet.created_at.desc())
             .limit(8)
             .all()
         )
     total = db.query(func.count(models.Projet.id)).scalar()
     lines = [f"\n[PROJETS — {len(projets)} résultats / {total} total]"]
-    for p in projets:#yaamel ligne li kol projet
+    for p in projets:
         salarie_nom = p.salarie.username if p.salarie else "N/A"
+        client_nom  = p.client.name if p.client else "N/A"   # ✅ objet relation
         lines.append(
-            f"- ID:{p.id} | Nom:{p.nom} | Client:{p.client} "
+            f"- ID:{p.id} | Nom:{p.nom} | Client:{client_nom} "
             f"| TJM vente:{p.tjm}€ | Marge cible:{p.marge_cible}% "
             f"| Statut:{p.status_paiement or 'N/A'} "
             f"| Responsable:{salarie_nom} "

@@ -53,7 +53,7 @@ class Projet(Base):
     __tablename__ = "projet"
     id = Column(Integer, primary_key=True, nullable=False)
     nom = Column(String, nullable=False, unique=True)
-    client=Column(String, nullable=False)
+    client_id = Column(Integer, ForeignKey("Clients.id"), nullable=False)
     marge_cible = Column(Float, nullable=True)
     tjm=Column(Integer, nullable=False)
     champ_remarque=Column(String, nullable=True)
@@ -61,6 +61,7 @@ class Projet(Base):
     salarie_id = Column(Integer, ForeignKey("salaries.id",ondelete="RESTRICT"),nullable=False)
     salarie = relationship("Salaries",back_populates="projets")
     historiques_projet = relationship("HistoriqueSalarie", back_populates="projet_sal")
+    client = relationship("Client", back_populates="projets")
     created_at = Column(TIMESTAMP(timezone=True),nullable=False, server_default=NOW)
     
 class HistoriqueSalarie(Base):
@@ -115,6 +116,7 @@ class Client(Base):
     date_modification = Column(BigInteger, nullable=True)
     factures = relationship("Facture", back_populates="client_obj",
                             foreign_keys="Facture.socid")
+    projets = relationship("Projet", back_populates="client")
     
 class Facture(Base):
     __tablename__ = "factures"

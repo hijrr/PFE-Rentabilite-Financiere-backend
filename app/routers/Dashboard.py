@@ -72,3 +72,45 @@ def global_kpi(db: Session = Depends(get_db)):
         "rentabilite_total": rentabilite_total or 0,
         "avg_tjm": avg_tjm or 0
     }
+@router.get("/dashboard/factures/impayees")
+def dashboard_factures_impayees(db: Session = Depends(get_db), limit: int = 10):
+    result = db.query(
+        Facture.id,
+        Facture.ref,
+        Facture.total_ttc,
+        Facture.sumpayed,
+        Facture.resteapayer,
+        Facture.date_lim_reglement,
+        Client.name
+    ).join(Client, Facture.socid == Client.id
+    ).filter(Facture.paye != "1"
+    ).order_by(desc(Facture.resteapayer)
+    ).limit(limit).all()
+
+    return [
+        {
+            "id": r[0],
+            "reference": r[1],
+            "total_ttc": float(r[2] or 0),
+            "montant_paye": float(r[3] or 0),
+            "reste_a_payer": float(r[4] or 0),
+            "date_lim_reglement": r[5],
+            "client": r[6]
+        }
+        for r in result
+    ]
+
+@router.get("/dashboard/projets/statut-paiement")
+def dashboard_projets_statut_paiement(db: Session = Depends(get_db)):
+    result = db.query(
+        Projet.status_paiement,
+        func.count(Projet.id).label("nombre")
+    ).group_by(Projet.status_paiement).all()
+
+    return [
+        {
+            "status_paiement": r[0] or "non_renseigne",
+            "nombre": r[1]
+        }
+        for r in result
+    ]
